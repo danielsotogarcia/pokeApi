@@ -1,0 +1,16 @@
+[{
+        "id": 1,
+        "name": "Bulbasur",
+        "type": "planta"
+    },
+    {
+        "id": 2,
+        "name": "Squirtle",
+        "type": "agua"
+    },
+    {
+        "id": 3,
+        "name": "Charmander",
+        "type": "fuego"
+    }
+]
