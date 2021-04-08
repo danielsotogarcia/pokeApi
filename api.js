@@ -1,13 +1,53 @@
 const express = require("express");
 const fs = require("fs");
 const bodyParser = require("body-parser");
+const fetch = require('node-fetch');
 
 const api = express();
 
-// CONF CORS
+// CONFIGURACION: CORS
+api.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+
+    // authorized headers for preflight requests
+    // https://developer.mozilla.org/en-US/docs/Glossary/preflight_request
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+    next();
+
+    api.options('*', (req, res) => {
+        // allowed XHR methods  
+        res.header('Access-Control-Allow-Methods', 'GET, PATCH, PUT, POST, DELETE, OPTIONS');
+        res.send();
+    });
+});
 
 // CONF DECODE BODYPARSER
+api.use(bodyParser.json()); // necesario para parseo de string json
 api.use(bodyParser.urlencoded({ extended: true })); //Decodificamos la informacion del body
+
+api.post("/api/cookie", (request, response) => {
+
+    const options = {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(request.body)
+    }
+
+    fetch("http://localhost:1012/server/cookie", options).then((response) => {
+        return response.json();
+    }).then((data) => {
+        response.status(200).send({
+            success: true,
+            url: "/cookie",
+            method: "POST",
+            message: "cookie guardada",
+            data: data
+        });
+    }).catch((err) => {
+        console.error(err);
+    });
+});
+
 
 // GET
 api.get("/api/pokemons", (request, response) => {
@@ -34,12 +74,6 @@ api.post("/api/pokemons", (request, response) => {
             message: "name and type is required"
         });
     } else {
-        //-1 creamos el nuevo pokemon obteniendo los datos de "request.query"
-        //-2 conseguismos el array
-        //-3 pusheamos el objeto en el array
-        //-4 introducimos el array con el nuevo item, parseando el array con JSON.stringify(array)
-        //-5 si todo ha ido bien respondemos con un mensaje de OK
-
         fs.readFile("db/dbPokemon.json", (err, data) => {
 
             const allPokemons = JSON.parse(data);
@@ -76,7 +110,7 @@ api.post("/api/pokemons", (request, response) => {
     }
 });
 
-//DELETE
+// DELETE
 api.delete("/api/pokemons", (request, response) => {
     if (!request.body.id) {
         response.status(400).send({
@@ -109,7 +143,7 @@ api.delete("/api/pokemons", (request, response) => {
                         err: err
                     });
                 } else {
-                    response.status(204).send({
+                    response.status(200).send({
                         success: true,
                         url: "/api/pokemons",
                         method: "DELETE",
@@ -125,9 +159,9 @@ api.delete("/api/pokemons", (request, response) => {
 
 });
 
-// GET ONE
-api.get("/api/onepokemon", (request, repsonse) => {
-    if (!request.query.id) { // o request.body.id
+// GET ONE BY QUERY STRING
+api.get("/api/onepokemon", (request, response) => {
+    if (!request.query.id) {
         response.status(400).send({
             success: false,
             url: "/api/onepokemon",
@@ -144,17 +178,17 @@ api.get("/api/onepokemon", (request, repsonse) => {
                     err: err
                 });
             } else {
-                const allPokemon = JSON.parse(data);
+                const allPokemons = JSON.parse(data);
                 //Conseguir el pokemon que se nos pide
-                onePokemon = allPokemons.filter(
-                    pokemon => pokemon.id === Number.parseInt(req.query.id)
+                onePokemon = allPokemons.find(
+                    pokemon => pokemon.id === Number.parseInt(request.query.id)
                 );
                 response.status(201).send({
                     success: true,
                     url: "/api/onepokemons",
                     method: "GET",
                     message: "pokemon encontrado correctamente",
-                    pokemon: onePokemon[0]
+                    pokemon: onePokemon
                 });
             }
         });
@@ -162,15 +196,14 @@ api.get("/api/onepokemon", (request, repsonse) => {
 
 });
 
-
-//api/pokemons/pk_001
+//GET ONE BY PARAMS
 api.get("/api/pokemons/:id", (request, response) => {
     const idPokemon = request.params.id;
     fs.readFile("db/dbPokemon.json", (err, data) => {
         const allPokemon = JSON.parse(data);
 
         const pokemon = allPokemon.find(
-            pokemon => pokemon.id === Number.parseInt(request.params.id)
+            pokemon => pokemon.id === Number.parseInt(idPokemon)
         );
 
         response.status(200).send({
@@ -183,7 +216,6 @@ api.get("/api/pokemons/:id", (request, response) => {
     });
 });
 
-
 // PUT
 api.put("/api/pokemons/:id", (request, response) => {
 
@@ -194,8 +226,6 @@ api.put("/api/pokemons/:id", (request, response) => {
 
         allPokemonsUpdate.forEach(pokemon => {
             if (pokemon.id === Number.parseInt(request.params.id)) {
-                /*if (request.body.type)
-                    pokemon.type = request.body.type;*/
 
                 pokemon.type = request.body.type ? request.body.type : pokemon.type;
                 pokemon.name = request.body.name ? request.body.name : pokemon.name;
@@ -219,7 +249,7 @@ api.put("/api/pokemons/:id", (request, response) => {
 
 });
 
-//PAGINADO
+// PAGINADO
 api.get("/api/pokemons/page/:page", (request, response) => {
 
     fs.readFile("db/dbPokemon.json", (err, data) => {
@@ -230,9 +260,10 @@ api.get("/api/pokemons/page/:page", (request, response) => {
 
         const PAGE_SIZE = 5;
 
+        const numPages = Math.round(allPokemons.length / PAGE_SIZE);
         const page = request.params.page;
         const initPage = (page * PAGE_SIZE) - PAGE_SIZE;
-        const endPage = page * PAGE_SIZE
+        const endPage = page * PAGE_SIZE;
 
         const pagePokemons = allPokemons.slice(initPage, endPage);
 
@@ -240,14 +271,13 @@ api.get("/api/pokemons/page/:page", (request, response) => {
             success: 'true',
             message: 'Pokedex Paginada',
             page: page,
-            // numPages: numPages,
+            numPages: numPages,
             pokemons: pagePokemons
         });
     });
 });
 
-
-//PAGINADO
+// PAGINADO OFFSET AND LIMIT
 api.get("/api/pageoffset/pokemons", (request, response) => {
     fs.readFile("db/dbPokemon.json", (err, data) => {
         const allPokemons = JSON.parse(data);
@@ -265,8 +295,8 @@ api.get("/api/pageoffset/pokemons", (request, response) => {
     });
 });
 
-// GET LOCATIONS
-app.get('/api/pokemons/:pokemonId/locations/:locationId', (req, res) => {
+// GET SUB RECURSOS
+api.get('/api/pokemons/:pokemonId/locations/:locationId', (req, res) => {
     fs.readFile("db/dbPokemon.json", (error, data) => {
         const allPokemons = JSON.parse(data);
 
@@ -301,6 +331,7 @@ app.get('/api/pokemons/:pokemonId/locations/:locationId', (req, res) => {
     });
 });
 
-api.listen(1010, () => {
-    console.log("POKEAPI corriendo en puerto 1010");
+const PORT = process.env.PORT || 1010;
+api.listen(PORT, () => {
+    console.log(`POKEAPI corriendo en puerto ${PORT}`);
 });
