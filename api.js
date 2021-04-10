@@ -1,7 +1,6 @@
 const express = require("express");
 const fs = require("fs");
 const bodyParser = require("body-parser");
-const fetch = require('node-fetch');
 
 const api = express();
 
@@ -24,30 +23,6 @@ api.use((req, res, next) => {
 // CONF DECODE BODYPARSER
 api.use(bodyParser.json()); // necesario para parseo de string json
 api.use(bodyParser.urlencoded({ extended: true })); //Decodificamos la informacion del body
-
-api.post("/api/cookie", (request, response) => {
-
-    const options = {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(request.body)
-    }
-
-    fetch("http://localhost:1012/server/cookie", options).then((response) => {
-        return response.json();
-    }).then((data) => {
-        response.status(200).send({
-            success: true,
-            url: "/cookie",
-            method: "POST",
-            message: "cookie guardada",
-            data: data
-        });
-    }).catch((err) => {
-        console.error(err);
-    });
-});
-
 
 // GET
 api.get("/api/pokemons", (request, response) => {
